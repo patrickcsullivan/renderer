@@ -6,59 +6,45 @@ pub use triangle::Triangle;
 /// A mesh of triangles.
 #[derive(Debug)]
 pub struct Mesh {
-    /// The vertices in world space that make up the mesh.
-    pub world_space_vertices: Vec<Point3<f32>>,
+    /// Contains a world space position for each vertex in the mesh.
+    pub world_space_positions: Vec<Point3<f32>>,
+
+    /// Contains a normal vector for each vertex in the mesh.
+    pub normals: Vec<Vector3<f32>>,
+
+    /// Contains a UV coordinate for each vertex in the mesh.
+    pub uvs: Option<Vec<Point2<f32>>>,
 
     /// An array that describes each triangle in the mesh. Each element of the
     /// array is a tuple that contains three indices into the `vertices` array.
     pub triangle_vertex_indices: Vec<(usize, usize, usize)>,
-
-    /// An array containing a tangent vector for each vertex in the mesh.
-    pub tangents: Option<Vec<Vector3<f32>>>,
-
-    /// An array containing a normal vector for each vertex in the mesh.
-    pub normals: Option<Vec<Vector3<f32>>>,
-
-    /// An array containing a UV coordinate for each vertex in the mesh.
-    pub uvs: Option<Vec<Point2<f32>>>,
 }
 
 pub struct MeshBuilder {
     object_to_world: Matrix4<f32>,
-    object_space_vertices: Vec<Point3<f32>>,
-    triangle_vertex_indices: Vec<(usize, usize, usize)>,
-    tangents: Option<Vec<Vector3<f32>>>,
-    normals: Option<Vec<Vector3<f32>>>,
+    object_space_positions: Vec<Point3<f32>>,
+    normals: Vec<Vector3<f32>>,
     uvs: Option<Vec<Point2<f32>>>,
+    triangle_vertex_indices: Vec<(usize, usize, usize)>,
 }
 
 impl MeshBuilder {
     pub fn new(
-        object_space_vertices: Vec<Point3<f32>>,
+        object_space_positions: Vec<Point3<f32>>,
+        normals: Vec<Vector3<f32>>,
         triangle_vertex_indices: Vec<(usize, usize, usize)>,
     ) -> Self {
         Self {
             object_to_world: Matrix4::from_scale(1.0),
-            object_space_vertices,
-            triangle_vertex_indices,
-            tangents: None,
-            normals: None,
+            object_space_positions,
+            normals,
             uvs: None,
+            triangle_vertex_indices,
         }
     }
 
     pub fn object_to_world(mut self, object_to_world: Matrix4<f32>) -> Self {
         self.object_to_world = object_to_world;
-        self
-    }
-
-    pub fn tangents(mut self, tangents: Vec<Vector3<f32>>) -> Self {
-        self.tangents = Some(tangents);
-        self
-    }
-
-    pub fn normals(mut self, normals: Vec<Vector3<f32>>) -> Self {
-        self.normals = Some(normals);
         self
     }
 
@@ -69,15 +55,14 @@ impl MeshBuilder {
 
     pub fn build(self) -> Mesh {
         Mesh {
-            world_space_vertices: self
-                .object_space_vertices
+            world_space_positions: self
+                .object_space_positions
                 .iter()
                 .map(|p| self.object_to_world.transform_point(*p))
                 .collect(),
-            triangle_vertex_indices: self.triangle_vertex_indices,
-            tangents: self.tangents,
             normals: self.normals,
             uvs: self.uvs,
+            triangle_vertex_indices: self.triangle_vertex_indices,
         }
     }
 
@@ -107,6 +92,6 @@ impl MeshBuilder {
             triangle_vertex_indices[i] = (3 * i, (3 * i) + 1, (3 * i) + 2);
         }
 
-        Ok(MeshBuilder::new(vertices, triangle_vertex_indices).normals(normals))
+        Ok(MeshBuilder::new(vertices, normals, triangle_vertex_indices))
     }
 }
