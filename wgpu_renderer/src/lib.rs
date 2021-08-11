@@ -6,7 +6,7 @@ mod texture;
 mod transformation;
 
 use camera::Camera;
-use cgmath::Rotation3;
+use cgmath::Matrix4;
 use light::PointLight;
 use mesh::Mesh;
 use mesh_buffers::GpuMeshBuffers;
@@ -18,7 +18,6 @@ pub struct Config<'a> {
     pub dst_path: &'a str,
     pub width: u32,
     pub height: u32,
-    pub model_translation: cgmath::Vector3<f32>,
     pub point_light_position: cgmath::Point3<f32>,
     pub camera_position: cgmath::Point3<f32>,
     pub camera_fovy: cgmath::Deg<f32>,
@@ -28,18 +27,10 @@ pub struct Config<'a> {
 pub async fn render(config: Config<'_>) {
     let (device, queue) = request_device().await;
 
-    let depth_texture = texture::Texture::create_depth_texture(
-        &device,
-        config.width,
-        config.height,
-        "Depth Texture",
-    );
+    let depth_texture =
+        Texture::create_depth_texture(&device, config.width, config.height, "Depth Texture");
 
-    let model_transformation = transformation::Transformation::new(
-        &device,
-        cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_x(), cgmath::Deg(-90.0)),
-        config.model_translation,
-    );
+    let model_transformation = Transformation::new(&device, Matrix4::from_scale(1.0));
 
     let camera = Camera::new_perspective_camera(
         &device,
@@ -51,8 +42,7 @@ pub async fn render(config: Config<'_>) {
         1000.0,
     );
 
-    let point_light =
-        light::PointLight::new(&device, config.point_light_position.into(), (1.0, 1.0, 1.0));
+    let point_light = PointLight::new(&device, config.point_light_position.into(), (1.0, 1.0, 1.0));
 
     let output_texture = texture::Texture::create_rgba_output_texture(
         &device,

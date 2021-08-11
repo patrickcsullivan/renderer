@@ -34,13 +34,7 @@ pub struct Transformation {
 }
 
 impl Transformation {
-    pub fn new(
-        device: &wgpu::Device,
-        rotation: Quaternion<f32>,
-        translation: Vector3<f32>,
-    ) -> Self {
-        let transformation = Matrix4::from_translation(translation) * Matrix4::from(rotation);
-
+    pub fn new(device: &wgpu::Device, transformation: Matrix4<f32>) -> Self {
         let mut uniform = TransformationUniform::new();
         uniform.update(transformation);
 
