@@ -10,11 +10,11 @@ pub struct Triangle<'msh> {
 
 impl<'msh> Triangle<'msh> {
     /// Returns the positions of the triangle's vertices in world space.
-    pub fn world_space_positions(&self) -> (Point3<f32>, Point3<f32>, Point3<f32>) {
+    pub fn positions(&self) -> (Point3<f32>, Point3<f32>, Point3<f32>) {
         let (i1, i2, i3) = self.mesh.triangle_vertex_indices[self.index_in_mesh];
-        let p1 = self.mesh.world_space_positions[i1];
-        let p2 = self.mesh.world_space_positions[i2];
-        let p3 = self.mesh.world_space_positions[i3];
+        let p1 = self.mesh.positions[i1];
+        let p2 = self.mesh.positions[i2];
+        let p3 = self.mesh.positions[i3];
         (p1, p2, p3)
     }
 
