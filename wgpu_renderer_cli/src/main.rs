@@ -1,7 +1,8 @@
 use anyhow::*;
-use cgmath::{point3, Deg, InnerSpace, Matrix4, Point3, Rad, Transform};
-use image::{ImageBuffer, Rgba};
+use cgmath::{point2, point3, Deg, InnerSpace, Matrix4, Point2, Point3, Rad, Transform};
+use image::{imageops, ImageBuffer, Rgba};
 use mesh::{Mesh, MeshBuilder};
+use std::cmp;
 use std::io::BufReader;
 
 fn main() -> Result<()> {
@@ -115,9 +116,20 @@ fn main() -> Result<()> {
         camera_fovy,
     };
     let pixels = futures::executor::block_on(wgpu_renderer::render(config));
-    let mut img_buffer: ImageBuffer<Rgba<u8>, _> =
-        ImageBuffer::from_raw(width, height, pixels).unwrap();
-    img_buffer.save(dst_path).unwrap();
+    let image: ImageBuffer<Rgba<u8>, _> = ImageBuffer::from_raw(width, height, pixels).unwrap();
+
+    let (crop_bounds_min, crop_bounds_max) = non_transparent_bounds(&image).unwrap();
+    let crop_bounds_diag = crop_bounds_max - crop_bounds_min;
+    let image = imageops::crop_imm(
+        &image,
+        crop_bounds_min.x,
+        crop_bounds_min.y,
+        crop_bounds_diag.x + 1,
+        crop_bounds_diag.y + 1,
+    )
+    .to_image();
+
+    image.save(dst_path).unwrap();
     Ok(())
 }
 
@@ -130,4 +142,29 @@ fn max_distance_from_origin(mesh: &Mesh) -> f32 {
             acc.max(dist2)
         })
         .sqrt()
+}
+
+/// Return the min and max (inclusive) pixels of a 2D bounding box around any
+/// non-transparent content in the image.
+fn non_transparent_bounds(
+    image: &ImageBuffer<Rgba<u8>, Vec<u8>>,
+) -> Option<(Point2<u32>, Point2<u32>)> {
+    let mut min_max = None;
+
+    for (x, y, rgba) in image.enumerate_pixels() {
+        if rgba.0[3] == 0 {
+            continue;
+        }
+
+        min_max = match min_max {
+            None => Some((point2(x, y), point2(x, y))),
+            Some((min, max)) => {
+                let new_min = point2(cmp::min(min.x, x), cmp::min(min.y, y));
+                let new_max = point2(cmp::max(max.x, x), cmp::max(max.y, y));
+                Some((new_min, new_max))
+            }
+        };
+    }
+
+    min_max
 }

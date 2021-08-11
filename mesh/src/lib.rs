@@ -40,8 +40,8 @@ impl Mesh {
             return None;
         }
 
-        let mut min = Point3::new(0.0, 0.0, 0.0);
-        let mut max = Point3::new(0.0, 0.0, 0.0);
+        let mut min = self.positions[0];
+        let mut max = self.positions[0];
 
         for p in &self.positions {
             if p.x < min.x {

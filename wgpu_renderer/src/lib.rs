@@ -41,7 +41,7 @@ pub async fn render(config: Config<'_>) -> Vec<u8> {
         1000.0,
     );
 
-    let point_light = PointLight::new(&device, config.point_light_position.into(), (1.0, 1.0, 1.0));
+    let point_light = PointLight::new(&device, config.point_light_position.into(), (0.7, 0.7, 0.7));
 
     let output_texture = texture::Texture::create_rgba_output_texture(
         &device,
