@@ -61,6 +61,11 @@ fn main() -> Result<()> {
                 .required(false)
                 .index(9),
         )
+        .arg(
+            clap::Arg::with_name("CROP")
+                .short("c")
+                .help("Enables cropping"),
+        )
         .get_matches();
 
     let src_path = matches.value_of("INPUT").unwrap();
@@ -88,6 +93,7 @@ fn main() -> Result<()> {
         Some(phi) => phi.parse::<f32>().unwrap(),
         None => 0.0,
     };
+    let is_crop_on = matches.is_present("CROP");
 
     let file = std::fs::File::open(&src_path).unwrap();
     let mut reader = BufReader::new(&file);
@@ -116,18 +122,20 @@ fn main() -> Result<()> {
         camera_fovy,
     };
     let pixels = futures::executor::block_on(wgpu_renderer::render(config));
-    let image: ImageBuffer<Rgba<u8>, _> = ImageBuffer::from_raw(width, height, pixels).unwrap();
+    let mut image: ImageBuffer<Rgba<u8>, _> = ImageBuffer::from_raw(width, height, pixels).unwrap();
 
-    let (crop_bounds_min, crop_bounds_max) = non_transparent_bounds(&image).unwrap();
-    let crop_bounds_diag = crop_bounds_max - crop_bounds_min;
-    let image = imageops::crop_imm(
-        &image,
-        crop_bounds_min.x,
-        crop_bounds_min.y,
-        crop_bounds_diag.x + 1,
-        crop_bounds_diag.y + 1,
-    )
-    .to_image();
+    if is_crop_on {
+        let (crop_bounds_min, crop_bounds_max) = non_transparent_bounds(&image).unwrap();
+        let crop_bounds_diag = crop_bounds_max - crop_bounds_min;
+        image = imageops::crop_imm(
+            &image,
+            crop_bounds_min.x,
+            crop_bounds_min.y,
+            crop_bounds_diag.x + 1,
+            crop_bounds_diag.y + 1,
+        )
+        .to_image();
+    }
 
     image.save(dst_path).unwrap();
     Ok(())
