@@ -3,4 +3,5 @@
 members = [
     "mesh",
     "wgpu_renderer",
+    "wgpu_renderer_cli",
 ]
