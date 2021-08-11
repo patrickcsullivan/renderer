@@ -63,7 +63,7 @@ impl Camera {
         let position: Point3<f32> = position.into();
         let target: Point3<f32> = target.into();
 
-        let inv_transf_matrix = Matrix4::look_at_rh(position, target, Vector3::unit_y());
+        let inv_transf_matrix = Matrix4::look_at_rh(position, target, Vector3::unit_z());
         let projection_matrix = cgmath::perspective(fovy, aspect, znear, zfar);
         let view_transf_matrix = OPENGL_TO_WGPU_MATRIX * projection_matrix * inv_transf_matrix;
 

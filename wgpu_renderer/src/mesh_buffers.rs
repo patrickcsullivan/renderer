@@ -50,7 +50,7 @@ impl GpuMeshBuffers {
     /// Load the mesh into GPU-accessible buffers.
     pub fn load(device: &wgpu::Device, mesh: &Mesh) -> Self {
         let vertices: Vec<GpuVertex> = mesh
-            .world_space_positions
+            .positions
             .iter()
             .zip(mesh.normals.iter())
             .map(|(p, n)| GpuVertex {

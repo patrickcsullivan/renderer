@@ -1,10 +1,8 @@
-mod bounding_box;
-
-use bounding_box::BoundingBox;
-use mesh::MeshBuilder;
+use anyhow::*;
+use cgmath::{point3, Deg, InnerSpace, Matrix4, Point3, Rad, Transform};
+use mesh::{Mesh, MeshBuilder};
 use std::io::BufReader;
-
-fn main() {
+fn main() -> Result<()> {
     let matches = clap::App::new("Part Viewer")
         .arg(
             clap::Arg::with_name("INPUT")
@@ -30,38 +28,102 @@ fn main() {
                 .required(true)
                 .index(4),
         )
+        .arg(
+            clap::Arg::with_name("CAMERA VERTICAL FOV")
+                .help("The camera's vertical field of view in degrees")
+                .required(true)
+                .index(5),
+        )
+        .arg(
+            clap::Arg::with_name("CAMERA POSITION POLAR ANGLE")
+                .help("The camera's spherical position theta component. This is the angle between the camera and the z axis. Default is 90.")
+                .required(false)
+                .index(6),
+        )
+        .arg(
+            clap::Arg::with_name("CAMERA POSITION AZIMUTHAL ANGLE")
+                .help("The camera's spherical position phi component. This is the angle between the camera and the x axis in the xy plane. Default is 0.")
+                .required(false)
+                .index(7),
+        )
+        .arg(
+            clap::Arg::with_name("LIGHT POSITION POLAR ANGLE")
+                .help("The light's spherical position theta component. This is the angle between the light and the z axis. Default is 0.")
+                .required(false)
+                .index(8),
+        )
+        .arg(
+            clap::Arg::with_name("LIGHT POSITION AZIMUTHAL ANGLE")
+                .help("The light's spherical position phi component. This is the angle between the light and the x axis in the xy plane. Default is 0.")
+                .required(false)
+                .index(9),
+        )
         .get_matches();
 
     let src_path = matches.value_of("INPUT").unwrap();
     let dst_path = matches.value_of("OUTPUT").unwrap();
     let width = matches.value_of("WIDTH").unwrap().parse::<u32>().unwrap();
     let height = matches.value_of("HEIGHT").unwrap().parse::<u32>().unwrap();
-
-    let aspect = width as f32 / height as f32;
+    let camera_fovy = Deg(matches
+        .value_of("CAMERA VERTICAL FOV")
+        .unwrap()
+        .parse::<f32>()
+        .unwrap());
+    let camera_theta = match matches.value_of("CAMERA POSITION POLAR ANGLE") {
+        Some(theta) => theta.parse::<f32>().unwrap(),
+        None => 90.0,
+    };
+    let camera_phi = match matches.value_of("CAMERA POSITION AZIMUTHAL ANGLE") {
+        Some(phi) => phi.parse::<f32>().unwrap(),
+        None => 0.0,
+    };
+    let light_theta = match matches.value_of("LIGHT POSITION POLAR ANGLE") {
+        Some(theta) => theta.parse::<f32>().unwrap(),
+        None => 0.0,
+    };
+    let light_phi = match matches.value_of("LIGHT POSITION AZIMUTHAL ANGLE") {
+        Some(phi) => phi.parse::<f32>().unwrap(),
+        None => 0.0,
+    };
 
     let file = std::fs::File::open(&src_path).unwrap();
     let mut reader = BufReader::new(&file);
-    let mesh = MeshBuilder::from_stl(&mut reader);
-    let mut bounding_box = BoundingBox::new(&mesh);
+    let mut mesh = MeshBuilder::from_stl(&mut reader)?.build();
 
-    // Shift the model and its bounding box so that the bounding box is centered
-    // on the origin.
-    let model_translation = bounding_box.center_to_origin();
-    bounding_box.shift(model_translation);
+    let (bounds_min, bounds_max) = mesh.bounding_box().unwrap();
+    let center = bounds_min + (bounds_max - bounds_min) / 2.0;
+    let center_to_origin = Point3::new(0.0f32, 0.0f32, 0.0f32) - center;
+    mesh.transform(Matrix4::from_translation(center_to_origin));
 
-    let look_down_axis = bounding_box.largest_cross_section_axis();
-    let camera_position = bounding_box.pick_camera_position(aspect, camera_fovy, &look_down_axis);
-    let point_light_position = bounding_box.pick_light_position(&look_down_axis);
+    let bounding_sphere_radius = max_distance_from_origin(&mesh);
+    let camera_dist = bounding_sphere_radius / f32::sin(Rad::from(camera_fovy / 2.0).0);
+    let camera_position = (Matrix4::from_angle_z(Deg(camera_phi))
+        * Matrix4::from_angle_y(Deg(camera_theta)))
+    .transform_point(Point3::new(0.0, 0.0, camera_dist));
+    let point_light_position = (Matrix4::from_angle_z(Deg(light_phi))
+        * Matrix4::from_angle_y(Deg(light_theta)))
+    .transform_point(Point3::new(0.0, 0.0, camera_dist));
 
-    let descrip = screenshot::ScreenshotDescriptor {
+    let config = wgpu_renderer::Config {
         mesh: &mesh,
         dst_path,
         width,
         height,
-        model_translation,
         point_light_position,
         camera_position,
         camera_fovy,
     };
-    futures::executor::block_on(screenshot::run(descrip));
+    futures::executor::block_on(wgpu_renderer::render(config));
+    Ok(())
+}
+
+/// Return the maximum distance between any vertex and the origin.
+fn max_distance_from_origin(mesh: &Mesh) -> f32 {
+    mesh.positions
+        .iter()
+        .fold(0.0f32, |acc, p| {
+            let dist2 = (p - point3(0.0, 0.0, 0.0)).magnitude2();
+            acc.max(dist2)
+        })
+        .sqrt()
 }

@@ -5,5 +5,5 @@ authors = ["Patrick Sullivan <patrick.sullivan@hey.com>"]
 edition = "2018"
 
 [dependencies]
-cgmath = "0.17"
+cgmath = "0.18"
 nom_stl = "0.2.2"
