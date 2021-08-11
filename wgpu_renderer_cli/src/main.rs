@@ -1,7 +1,9 @@
 use anyhow::*;
 use cgmath::{point3, Deg, InnerSpace, Matrix4, Point3, Rad, Transform};
+use image::{ImageBuffer, Rgba};
 use mesh::{Mesh, MeshBuilder};
 use std::io::BufReader;
+
 fn main() -> Result<()> {
     let matches = clap::App::new("Part Viewer")
         .arg(
@@ -106,14 +108,16 @@ fn main() -> Result<()> {
 
     let config = wgpu_renderer::Config {
         mesh: &mesh,
-        dst_path,
         width,
         height,
         point_light_position,
         camera_position,
         camera_fovy,
     };
-    futures::executor::block_on(wgpu_renderer::render(config));
+    let pixels = futures::executor::block_on(wgpu_renderer::render(config));
+    let mut img_buffer: ImageBuffer<Rgba<u8>, _> =
+        ImageBuffer::from_raw(width, height, pixels).unwrap();
+    img_buffer.save(dst_path).unwrap();
     Ok(())
 }
 

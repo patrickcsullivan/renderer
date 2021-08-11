@@ -15,7 +15,6 @@ use transformation::Transformation;
 
 pub struct Config<'a> {
     pub mesh: &'a Mesh,
-    pub dst_path: &'a str,
     pub width: u32,
     pub height: u32,
     pub point_light_position: cgmath::Point3<f32>,
@@ -24,7 +23,7 @@ pub struct Config<'a> {
 }
 
 /// Generate a screenshot.
-pub async fn render(config: Config<'_>) {
+pub async fn render(config: Config<'_>) -> Vec<u8> {
     let (device, queue) = request_device().await;
 
     let depth_texture =
@@ -74,15 +73,18 @@ pub async fn render(config: Config<'_>) {
         &output_texture,
         &output_buffer,
     );
-    save_buffer_to_image(
-        &device,
-        &output_buffer,
-        config.dst_path,
-        config.width,
-        config.height,
-    )
-    .await;
+    poll_from_device_to_buffer(&device, &output_buffer).await;
+
+    let data: Vec<u8> = output_buffer
+        .slice(..)
+        .get_mapped_range()
+        .iter()
+        .cloned()
+        .collect();
+
     output_buffer.unmap();
+
+    data
 }
 
 /// Request the GPU device and its queue.
@@ -116,14 +118,8 @@ fn create_output_buffer(device: &wgpu::Device, width: u32, height: u32) -> wgpu:
     device.create_buffer(&output_buffer_desc)
 }
 
-/// Poll data from the device and write the output buffer to the destination path.
-async fn save_buffer_to_image(
-    device: &wgpu::Device,
-    output_buffer: &wgpu::Buffer,
-    dst_path: &str,
-    width: u32,
-    height: u32,
-) {
+/// Poll data from the device into the output buffer.
+async fn poll_from_device_to_buffer(device: &wgpu::Device, output_buffer: &wgpu::Buffer) {
     let buffer_slice = output_buffer.slice(..);
 
     // We have to create the mapping THEN device.poll() before await the
@@ -131,10 +127,4 @@ async fn save_buffer_to_image(
     let mapping = buffer_slice.map_async(wgpu::MapMode::Read);
     device.poll(wgpu::Maintain::Wait);
     mapping.await.unwrap();
-
-    let data = buffer_slice.get_mapped_range();
-
-    use image::{ImageBuffer, Rgba};
-    let buffer = ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, data).unwrap();
-    buffer.save(dst_path).unwrap();
 }
