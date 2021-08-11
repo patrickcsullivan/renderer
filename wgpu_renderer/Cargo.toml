@@ -10,3 +10,8 @@ cgmath = "0.18"
 image = "0.23"
 mesh = { path = "../mesh" }
 wgpu = "0.7"
+
+[build-dependencies]
+anyhow = "1.0"
+glob = "0.3"
+shaderc = "0.7"

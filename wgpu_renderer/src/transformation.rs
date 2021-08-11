@@ -1,4 +1,4 @@
-use cgmath::{Matrix4, Quaternion, Vector3};
+use cgmath::Matrix4;
 use wgpu::util::DeviceExt;
 
 /// Uniform data that can be sent to the shaders. Contains the model
