@@ -33,8 +33,8 @@ fn main() -> Result<()> {
         )
         .arg(
             clap::Arg::with_name("CAMERA VERTICAL FOV")
-                .help("The camera's vertical field of view in degrees")
-                .required(true)
+                .help("The camera's vertical field of view in degrees. Default is 45.")
+                .required(false)
                 .index(5),
         )
         .arg(
@@ -62,6 +62,12 @@ fn main() -> Result<()> {
                 .index(9),
         )
         .arg(
+            clap::Arg::with_name("LIGHT INTENSITY")
+                .help("The light's intensity. Default is 1.0.")
+                .required(false)
+                .index(10),
+        )
+        .arg(
             clap::Arg::with_name("CROP")
                 .short("c")
                 .help("Enables cropping"),
@@ -74,25 +80,34 @@ fn main() -> Result<()> {
     let height = matches.value_of("HEIGHT").unwrap().parse::<u32>().unwrap();
     let camera_fovy = Deg(matches
         .value_of("CAMERA VERTICAL FOV")
-        .unwrap()
+        .unwrap_or("45")
         .parse::<f32>()
         .unwrap());
-    let camera_theta = match matches.value_of("CAMERA POSITION POLAR ANGLE") {
-        Some(theta) => theta.parse::<f32>().unwrap(),
-        None => 90.0,
-    };
-    let camera_phi = match matches.value_of("CAMERA POSITION AZIMUTHAL ANGLE") {
-        Some(phi) => phi.parse::<f32>().unwrap(),
-        None => 0.0,
-    };
-    let light_theta = match matches.value_of("LIGHT POSITION POLAR ANGLE") {
-        Some(theta) => theta.parse::<f32>().unwrap(),
-        None => 0.0,
-    };
-    let light_phi = match matches.value_of("LIGHT POSITION AZIMUTHAL ANGLE") {
-        Some(phi) => phi.parse::<f32>().unwrap(),
-        None => 0.0,
-    };
+    let camera_theta = Deg(matches
+        .value_of("CAMERA POSITION POLAR ANGLE")
+        .unwrap_or("90")
+        .parse::<f32>()
+        .unwrap());
+    let camera_phi = Deg(matches
+        .value_of("CAMERA POSITION AZIMUTHAL ANGLE")
+        .unwrap_or("0")
+        .parse::<f32>()
+        .unwrap());
+    let light_theta = Deg(matches
+        .value_of("LIGHT POSITION POLAR ANGLE")
+        .unwrap_or("0")
+        .parse::<f32>()
+        .unwrap());
+    let light_phi = Deg(matches
+        .value_of("LIGHT POSITION AZIMUTHAL ANGLE")
+        .unwrap_or("0")
+        .parse::<f32>()
+        .unwrap());
+    let point_light_intensity = matches
+        .value_of("LIGHT INTENSITY")
+        .unwrap_or("1.0")
+        .parse::<f32>()
+        .unwrap();
     let is_crop_on = matches.is_present("CROP");
 
     let file = std::fs::File::open(&src_path).unwrap();
@@ -106,20 +121,20 @@ fn main() -> Result<()> {
 
     let bounding_sphere_radius = max_distance_from_origin(&mesh);
     let camera_dist = bounding_sphere_radius / f32::sin(Rad::from(camera_fovy / 2.0).0);
-    let camera_position = (Matrix4::from_angle_z(Deg(camera_phi))
-        * Matrix4::from_angle_y(Deg(camera_theta)))
-    .transform_point(Point3::new(0.0, 0.0, camera_dist));
-    let point_light_position = (Matrix4::from_angle_z(Deg(light_phi))
-        * Matrix4::from_angle_y(Deg(light_theta)))
+    let camera_position = (Matrix4::from_angle_z(camera_phi) * Matrix4::from_angle_y(camera_theta))
+        .transform_point(Point3::new(0.0, 0.0, camera_dist));
+    let point_light_position = (Matrix4::from_angle_z(light_phi)
+        * Matrix4::from_angle_y(light_theta))
     .transform_point(Point3::new(0.0, 0.0, camera_dist));
 
     let config = wgpu_renderer::Config {
         mesh: &mesh,
         width,
         height,
-        point_light_position,
-        camera_position,
         camera_fovy,
+        camera_position,
+        point_light_position,
+        point_light_intensity,
     };
     let pixels = futures::executor::block_on(wgpu_renderer::render(config));
     let mut image: ImageBuffer<Rgba<u8>, _> = ImageBuffer::from_raw(width, height, pixels).unwrap();

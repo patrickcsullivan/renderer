@@ -17,9 +17,10 @@ pub struct Config<'a> {
     pub mesh: &'a Mesh,
     pub width: u32,
     pub height: u32,
-    pub point_light_position: cgmath::Point3<f32>,
-    pub camera_position: cgmath::Point3<f32>,
     pub camera_fovy: cgmath::Deg<f32>,
+    pub camera_position: cgmath::Point3<f32>,
+    pub point_light_position: cgmath::Point3<f32>,
+    pub point_light_intensity: f32,
 }
 
 /// Generate a screenshot.
@@ -41,7 +42,15 @@ pub async fn render(config: Config<'_>) -> Vec<u8> {
         1000.0,
     );
 
-    let point_light = PointLight::new(&device, config.point_light_position.into(), (0.7, 0.7, 0.7));
+    let point_light = PointLight::new(
+        &device,
+        config.point_light_position.into(),
+        (
+            config.point_light_intensity,
+            config.point_light_intensity,
+            config.point_light_intensity,
+        ),
+    );
 
     let output_texture = texture::Texture::create_rgba_output_texture(
         &device,
