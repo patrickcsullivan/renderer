@@ -1,9 +1,12 @@
 mod camera;
+mod error;
 mod light;
 mod mesh_buffers;
 mod render_pipeline;
 mod texture;
 mod transformation;
+
+pub use error::{Error, Result};
 
 use camera::Camera;
 use cgmath::Matrix4;
@@ -24,8 +27,8 @@ pub struct Config<'a> {
 }
 
 /// Generate a screenshot.
-pub async fn render(config: Config<'_>) -> Vec<u8> {
-    let (device, queue) = request_device().await;
+pub async fn render(config: Config<'_>) -> Result<Vec<u8>> {
+    let (device, queue) = request_device().await?;
 
     let depth_texture =
         Texture::create_depth_texture(&device, config.width, config.height, "Depth Texture");
@@ -82,7 +85,7 @@ pub async fn render(config: Config<'_>) -> Vec<u8> {
         &output_texture,
         &output_buffer,
     );
-    poll_from_device_to_buffer(&device, &output_buffer).await;
+    poll_from_device_to_buffer(&device, &output_buffer).await?;
 
     let data: Vec<u8> = output_buffer
         .slice(..)
@@ -93,11 +96,11 @@ pub async fn render(config: Config<'_>) -> Vec<u8> {
 
     output_buffer.unmap();
 
-    data
+    Ok(data)
 }
 
 /// Request the GPU device and its queue.
-async fn request_device() -> (wgpu::Device, wgpu::Queue) {
+async fn request_device() -> Result<(wgpu::Device, wgpu::Queue)> {
     let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
@@ -105,11 +108,9 @@ async fn request_device() -> (wgpu::Device, wgpu::Queue) {
             compatible_surface: None,
         })
         .await
-        .unwrap();
-    adapter
-        .request_device(&Default::default(), None)
-        .await
-        .unwrap()
+        .ok_or(Error::NoAdapter)?;
+    let (device, queue) = adapter.request_device(&Default::default(), None).await?;
+    Ok((device, queue))
 }
 
 /// Create the buffer onto which the output image will be written.
@@ -128,12 +129,16 @@ fn create_output_buffer(device: &wgpu::Device, width: u32, height: u32) -> wgpu:
 }
 
 /// Poll data from the device into the output buffer.
-async fn poll_from_device_to_buffer(device: &wgpu::Device, output_buffer: &wgpu::Buffer) {
+async fn poll_from_device_to_buffer(
+    device: &wgpu::Device,
+    output_buffer: &wgpu::Buffer,
+) -> Result<()> {
     let buffer_slice = output_buffer.slice(..);
 
     // We have to create the mapping THEN device.poll() before await the
     // future. Otherwise the application will freeze.
     let mapping = buffer_slice.map_async(wgpu::MapMode::Read);
     device.poll(wgpu::Maintain::Wait);
-    mapping.await.unwrap();
+    mapping.await?;
+    Ok(())
 }

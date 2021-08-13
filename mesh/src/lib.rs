@@ -1,7 +1,10 @@
+mod error;
 mod triangle;
 
-use cgmath::{InnerSpace, Matrix4, Point2, Point3, Transform, Vector3};
+pub use error::{Error, Result};
 pub use triangle::Triangle;
+
+use cgmath::{InnerSpace, Matrix4, Point2, Point3, Transform, Vector3};
 
 /// A mesh of triangles.
 #[derive(Debug)]
@@ -103,7 +106,7 @@ impl MeshBuilder {
         }
     }
 
-    pub fn from_stl<R>(stl_bytes: &mut R) -> Result<MeshBuilder, nom_stl::Error>
+    pub fn from_stl<R>(stl_bytes: &mut R) -> Result<MeshBuilder>
     where
         R: std::io::Read + std::io::Seek,
     {

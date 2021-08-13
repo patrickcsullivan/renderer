@@ -1,5 +1,7 @@
-use anyhow::*;
+mod error;
+
 use cgmath::{point2, point3, Deg, InnerSpace, Matrix4, Point2, Point3, Rad, Transform};
+use error::{Error, Result};
 use image::{imageops, ImageBuffer, Rgba};
 use mesh::{Mesh, MeshBuilder};
 use std::cmp;
@@ -74,47 +76,43 @@ fn main() -> Result<()> {
         )
         .get_matches();
 
+    // The first four arguments are required by Clap, so unwrapping them is ok.
     let src_path = matches.value_of("INPUT").unwrap();
     let dst_path = matches.value_of("OUTPUT").unwrap();
-    let width = matches.value_of("WIDTH").unwrap().parse::<u32>().unwrap();
-    let height = matches.value_of("HEIGHT").unwrap().parse::<u32>().unwrap();
+    let width = matches.value_of("WIDTH").unwrap().parse::<u32>()?;
+    let height = matches.value_of("HEIGHT").unwrap().parse::<u32>()?;
+
     let camera_fovy = Deg(matches
         .value_of("CAMERA VERTICAL FOV")
         .unwrap_or("45")
-        .parse::<f32>()
-        .unwrap());
+        .parse::<f32>()?);
     let camera_theta = Deg(matches
         .value_of("CAMERA POSITION POLAR ANGLE")
         .unwrap_or("90")
-        .parse::<f32>()
-        .unwrap());
+        .parse::<f32>()?);
     let camera_phi = Deg(matches
         .value_of("CAMERA POSITION AZIMUTHAL ANGLE")
         .unwrap_or("0")
-        .parse::<f32>()
-        .unwrap());
+        .parse::<f32>()?);
     let light_theta = Deg(matches
         .value_of("LIGHT POSITION POLAR ANGLE")
         .unwrap_or("0")
-        .parse::<f32>()
-        .unwrap());
+        .parse::<f32>()?);
     let light_phi = Deg(matches
         .value_of("LIGHT POSITION AZIMUTHAL ANGLE")
         .unwrap_or("0")
-        .parse::<f32>()
-        .unwrap());
+        .parse::<f32>()?);
     let point_light_intensity = matches
         .value_of("LIGHT INTENSITY")
         .unwrap_or("1.0")
-        .parse::<f32>()
-        .unwrap();
+        .parse::<f32>()?;
     let is_crop_on = matches.is_present("CROP");
 
-    let file = std::fs::File::open(&src_path).unwrap();
+    let file = std::fs::File::open(&src_path)?;
     let mut reader = BufReader::new(&file);
     let mut mesh = MeshBuilder::from_stl(&mut reader)?.build();
 
-    let (bounds_min, bounds_max) = mesh.bounding_box().unwrap();
+    let (bounds_min, bounds_max) = mesh.bounding_box().ok_or(Error::EmptyMesh)?;
     let center = bounds_min + (bounds_max - bounds_min) / 2.0;
     let center_to_origin = Point3::new(0.0f32, 0.0f32, 0.0f32) - center;
     mesh.transform(Matrix4::from_translation(center_to_origin));
@@ -136,11 +134,13 @@ fn main() -> Result<()> {
         point_light_position,
         point_light_intensity,
     };
-    let pixels = futures::executor::block_on(wgpu_renderer::render(config));
-    let mut image: ImageBuffer<Rgba<u8>, _> = ImageBuffer::from_raw(width, height, pixels).unwrap();
+    let pixels = futures::executor::block_on(wgpu_renderer::render(config))?;
+    let mut image: ImageBuffer<Rgba<u8>, _> =
+        ImageBuffer::from_raw(width, height, pixels).ok_or(Error::ImageContainerTooSmall)?;
 
     if is_crop_on {
-        let (crop_bounds_min, crop_bounds_max) = non_transparent_bounds(&image).unwrap();
+        let (crop_bounds_min, crop_bounds_max) =
+            non_transparent_bounds(&image).ok_or(Error::ZeroAreaImage)?;
         let crop_bounds_diag = crop_bounds_max - crop_bounds_min;
         image = imageops::crop_imm(
             &image,
@@ -152,7 +152,7 @@ fn main() -> Result<()> {
         .to_image();
     }
 
-    image.save(dst_path).unwrap();
+    image.save(dst_path)?;
     Ok(())
 }
 
