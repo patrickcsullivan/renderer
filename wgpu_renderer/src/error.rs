@@ -16,7 +16,7 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::Io(e) => write!(f, "Network Error: {:?}", e),
+            Error::Io(e) => write!(f, "Network error: {:?}", e),
             Error::BufferAsync(e) => write!(f, "Buffer async error: {:?}", e),
             Error::RequestDevice(e) => write!(
                 f,

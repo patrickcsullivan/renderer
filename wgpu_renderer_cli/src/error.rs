@@ -1,7 +1,6 @@
 use std::convert::From;
 use std::error;
 use std::fmt;
-use std::num::{ParseFloatError, ParseIntError};
 use std::result;
 
 pub type Result<T> = result::Result<T, Error>;
@@ -45,7 +44,7 @@ impl error::Error for Error {
             Error::Renderer(e) => Some(e),
             Error::ParseInt(e) => Some(e),
             Error::ParseFloat(e) => Some(e),
-            Error::Image(e) => None,
+            Error::Image(e) => Some(e),
             Error::ImageContainerTooSmall => None,
             Error::EmptyMesh => None,
             Error::ZeroAreaImage => None,
